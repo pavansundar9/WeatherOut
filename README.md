@@ -1,6 +1,5 @@
 # Weather Data Visualization Project
 
-![image](https://github.com/pavansundar9/WeatherOut/assets/141473568/e21ac02a-b360-41fe-b498-55d12f65d810)
 
 ## Description
 
@@ -11,7 +10,8 @@ This project is a web-based weather data visualization tool that allows you to e
 You can see a live demo of the project [here]
 
 
-https://github.com/pavansundar9/WeatherOut/assets/141473568/bd5caa14-70fb-41c1-8198-f352abb2dc6f
+https://github.com/pavansundar9/WeatherOut/assets/141473568/a7231dd2-94a9-43fd-95ce-99f1a6fca03f
+
 
 
 ## Features
