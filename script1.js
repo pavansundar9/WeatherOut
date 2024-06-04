@@ -410,5 +410,6 @@ function clearHistory(event) {
     localStorage.removeItem("cityname");
 }
 
+clearHistoryBtn.addEventListener('click', clearHistory);
 // Initialize on page load
 window.addEventListener('load', getUserLocationAndDisplayWeather);
