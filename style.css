@@ -283,6 +283,7 @@ p {
         position: relative;
     }
     .weather-details{
+        width: 90%;
         grid-template-columns: 1fr;
     }
     .child{
