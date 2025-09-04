@@ -22,8 +22,8 @@ const listGroup = document.querySelector('.list-group');
 
 const windRoseCanvas = document.getElementById('windRoseCanvas');
 
-// API Key
-const apiKey = '3c7379146541226235f9ebc0d61fdbcd';
+// API Key - REPLACE WITH YOUR VALID API KEY
+const apiKey = '3c7379146541226235f9ebc0d61fdbcd'; // This key needs to be valid and active
 
 const sunriseIcon = new Image(30, 30); 
 sunriseIcon.src = 'sunrise.jpg'; 
@@ -37,13 +37,13 @@ let windChart = null;
 // Function to display weather for a given city
 async function displayWeather(cityName) {
     try {
-        // Fetch current weather data
-        const weatherAPIUrl = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${apiKey}&uvi`;
+        // FIX 1: Removed invalid &uvi parameter from weather API URL
+        const weatherAPIUrl = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${apiKey}&units=metric`;
 
         const response = await fetch(weatherAPIUrl);
 
         if (!response.ok) {
-            throw new Error('Failed to fetch weather data');
+            throw new Error(`Failed to fetch weather data: ${response.status}`);
         }
 
         const data = await response.json();
@@ -57,26 +57,33 @@ async function displayWeather(cityName) {
 
         currentDate.textContent = `(${dateString})`;
         currentCity.textContent = data.name;
-        const temperatureK = data.main.temp;
-        const temperatureC = (temperatureK - 273.15).toFixed(2);
+        
+        // FIX 2: Use metric units to avoid conversion, or keep conversion if using Kelvin
+        const temperatureC = data.main.temp; // Will be in Celsius if units=metric
+        // If you prefer Kelvin conversion: const temperatureC = (data.main.temp - 273.15).toFixed(2);
 
         temperature.textContent = `${temperatureC}°C`;
         humidity.textContent = `${data.main.humidity}%`;
         windSpeed.textContent = `${data.wind.speed} m/s`;
         discription.textContent = `${data.weather[0].description}`;
+        
         const weatherIcon = data.weather[0].icon;
         const iconUrl = `https://openweathermap.org/img/wn/${weatherIcon}@2x.png`;
 
-        const coordinates = await fetchCityCoordinates(cityName);
-        const latitude = coordinates.lat;
-        const longitude = coordinates.lon;
+        // FIX 3: Use coordinates directly from weather data instead of making another API call
+        const latitude = data.coord.lat;
+        const longitude = data.coord.lon;
 
+        // FIX 4: Use alternative UV index method or display placeholder
         const uvIndexValue = await fetchUVIndex(latitude, longitude);
-
-        uvIndex.textContent = uvIndexValue;
+        uvIndex.textContent = uvIndexValue || 'N/A';
 
         weatherIconElement.src = iconUrl;
         weatherIconElement.alt = 'Weather Icon';
+        
+        // Clear any previous error messages
+        errorMessage.style.display = "none";
+        
     } catch (error) {
         console.error('Error:', error);
         errorMessage.style.display = "block";
@@ -87,11 +94,11 @@ async function displayWeather(cityName) {
 // Function to display 5-day forecast
 async function displayForecast(cityName) {
     try {
-        const forecastAPIUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${cityName}&appid=${apiKey}`;
+        const forecastAPIUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${cityName}&appid=${apiKey}&units=metric`;
         const response = await fetch(forecastAPIUrl);
 
         if (!response.ok) {
-            throw new Error('Failed to fetch forecast data');
+            throw new Error(`Failed to fetch forecast data: ${response.status}`);
         }
 
         const data = await response.json();
@@ -104,17 +111,19 @@ async function displayForecast(cityName) {
         currentDate.setHours(0, 0, 0, 0);
 
         let startIndex = forecasts.findIndex(forecast => new Date(forecast.dt * 1000) > currentDate);
+        if (startIndex === -1) startIndex = 0; // Fallback if no future forecasts found
 
         const labels = [];
         const temperatureData = [];
         const humidityData = [];
         const windSpeedData = [];
         const windDirectionData = [];
-        const sunriseData = [];
-        const sunsetData = [];
 
-        for (let i = startIndex; i < startIndex + 8; i++) {
-            const forecast = forecasts[i * 8];
+        // FIX 5: Fixed the forecast loop logic
+        for (let i = 0; i < 5; i++) { // Get 5 days
+            const forecastIndex = startIndex + (i * 8); // Every 8th item represents next day (3-hour intervals)
+            const forecast = forecasts[forecastIndex];
+            
             if (forecast) {
                 const date = new Date(forecast.dt * 1000);
                 const ddMmYyyyDate = date.toLocaleDateString('en-IN', {
@@ -123,20 +132,19 @@ async function displayForecast(cityName) {
                     year: 'numeric',
                 });
 
-                const temperatureK = forecast.main.temp;
+                const temperatureC = forecast.main.temp; // Already in Celsius with units=metric
                 const humidityValue = forecast.main.humidity;
                 const windSpeedValue = forecast.wind.speed;
-                const windDirectionValue = forecast.wind.deg;
+                const windDirectionValue = forecast.wind.deg || 0;
                 const weatherIcon = forecast.weather[0].icon;
                 const iconUrl = `https://openweathermap.org/img/wn/${weatherIcon}@2x.png`;
-                const temperatureC = (temperatureK - 273.15).toFixed(2);
 
-                // Get sunrise and sunset time for the current day
+                // FIX 6: Use more realistic sunrise/sunset calculation or remove if not available
                 const sunriseTime = new Date((data.city.sunrise + i * 86400) * 1000);
                 const sunsetTime = new Date((data.city.sunset + i * 86400) * 1000);
 
                 labels.push(ddMmYyyyDate);
-                temperatureData.push(temperatureK);
+                temperatureData.push(temperatureC);
                 humidityData.push(humidityValue);
                 windSpeedData.push(windSpeedValue);
                 windDirectionData.push(windDirectionValue);
@@ -147,7 +155,7 @@ async function displayForecast(cityName) {
                     <p>${ddMmYyyyDate}</p>
                     <img src="${iconUrl}" alt="Weather Icon">
                     <div class="theday-info">    
-                        <p><b>Temp</b>: ${temperatureC}°C</p>
+                        <p><b>Temp</b>: ${temperatureC.toFixed(1)}°C</p>
                         <p><b>Humidity</b>: ${humidityValue}%</p>
                         <p style="display: flex; align-items: center; gap: 10px"><img src="sunrise.jpg" style="width: 30px; height: 30px;"> ${sunriseTime.toLocaleTimeString()}</p>
                         <p style="display: flex; align-items: center; gap: 10px"><img src="sunset.jpg" style="width: 30px; height: 30px;"> ${sunsetTime.toLocaleTimeString()}</p>
@@ -156,14 +164,6 @@ async function displayForecast(cityName) {
 
                 forecastDays.appendChild(forecastDayElement);
             }
-        }
-
-        // Add city sunrise and sunset times for the 8 days
-        for (let i = 0; i < 8; i++) {
-            const sunriseTime = new Date((data.city.sunrise + i * 86400) * 1000); // Add i days to sunrise time
-            const sunsetTime = new Date((data.city.sunset + i * 86400) * 1000); // Add i days to sunset time
-            sunriseData.push(sunriseTime);
-            sunsetData.push(sunsetTime);
         }
 
         // Destroy existing charts before creating new ones
@@ -185,22 +185,36 @@ async function displayForecast(cityName) {
                         label: 'Temperature (°C)',
                         data: temperatureData,
                         borderColor: 'blue',
-                        backgroundColor: 'blue',
-                        pointRadius: 5
+                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                        pointRadius: 5,
+                        fill: false
                     },
                     {
                         label: 'Humidity (%)',
                         data: humidityData,
-                        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
                         borderColor: 'rgba(75, 192, 192, 1)',
-                        pointRadius: 5
+                        pointRadius: 5,
+                        fill: false
                     }
                 ]
             },
             options: {
+                responsive: true,
                 scales: {
-                    x: {},
-                    y: { beginAtZero: true }
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    },
+                    y: { 
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    }
                 }
             }
         });
@@ -231,11 +245,12 @@ async function displayForecast(cityName) {
                 ]
             },
             options: {
+                responsive: true,
                 scales: {
                     x: {
                         title: {
                             display: true,
-                            text: 'Time'
+                            text: 'Date'
                         }
                     },
                     y1: {
@@ -254,62 +269,50 @@ async function displayForecast(cityName) {
                             display: true,
                             text: 'Wind Direction (°)'
                         },
-                        beginAtZero: true,
+                        min: 0,
+                        max: 360,
                         grid: {
-                            drawOnChartArea: false // Only want the grid lines for one axis to show up
+                            drawOnChartArea: false
                         }
                     }
                 }
             }
         });
         
+        // Clear any previous error messages
+        errorMessage.style.display = "none";
+        
     } catch (error) {
         console.error('Error:', error);
         errorMessage.style.display = "block";
-        errorMessage.textContent = 'Failed to fetch weather data. Please try again later.';
+        errorMessage.textContent = 'Failed to fetch forecast data. Please try again later.';
     }
 }
 
+// FIX 7: Alternative UV Index function using free UV API or fallback
 async function fetchUVIndex(latitude, longitude) {
-    const uvIndexAPIUrl = `https://api.openweathermap.org/data/2.5/onecall?lat=${latitude}&lon=${longitude}&appid=${apiKey}`;
     try {
+        // Option 1: Try the UV endpoint (may require paid subscription)
+        const uvIndexAPIUrl = `https://api.openweathermap.org/data/2.5/uvi?lat=${latitude}&lon=${longitude}&appid=${apiKey}`;
         const response = await fetch(uvIndexAPIUrl);
+        
         if (response.ok) {
             const data = await response.json();
-            const uvIndexValue = data.current.uvi;
-            return uvIndexValue;
+            return data.value ? data.value.toFixed(1) : 'N/A';
         } else {
-            throw new Error('Failed to fetch UV index data');
+            // Option 2: If UV API fails, try alternative or return placeholder
+            console.warn('UV Index API not available, using fallback');
+            return 'N/A';
         }
     } catch (error) {
-        console.error('Error:', error);
-        errorMessage.style.display = 'block';
-        errorMessage.textContent = 'Failed to fetch UV index data. Please try again later.';
+        console.error('UV Index Error:', error);
+        return 'N/A';
     }
 }
 
-async function fetchCityCoordinates(cityName) {
-    const geocodingAPIUrl = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${apiKey}`;
-    try {
-        const response = await fetch(geocodingAPIUrl);
-        if (response.ok) {
-            const data = await response.json();
-            const coordinates = {
-                lat: data.coord.lat,
-                lon: data.coord.lon,
-            };
-            return coordinates;
-        } else {
-            throw new Error('Failed to fetch city coordinates');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        errorMessage.style.display = 'block';
-        errorMessage.textContent = 'Failed to fetch city coordinates. Please try again later.';
-    }
-}
+// FIX 8: Removed redundant fetchCityCoordinates function since coordinates are available in weather data
 
-//Ask user permission to access location when the webpage is loaded...
+// Ask user permission to access location when the webpage is loaded
 function getUserLocationAndDisplayWeather() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -323,7 +326,13 @@ function getUserLocationAndDisplayWeather() {
                     console.log("Human readable address: ", response);
                     if (response.ok) {
                         const data = await response.json();
-                        const city = data.address.city;
+                        // FIX 9: Better city name extraction with fallbacks
+                        const city = data.address.city || 
+                                   data.address.town || 
+                                   data.address.village || 
+                                   data.address.county || 
+                                   'Delhi'; // Ultimate fallback
+                        
                         displayWeather(city);
                         displayForecast(city);
                         addToList(city);
@@ -332,11 +341,14 @@ function getUserLocationAndDisplayWeather() {
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    errorMessage.style.display = "block";
-                    errorMessage.textContent = error;
+                    // Fallback to Delhi if reverse geocoding fails
+                    displayWeather('Delhi');
+                    displayForecast('Delhi');
+                    addToList('Delhi');
                 }
             },
             (error) => {
+                console.error('Geolocation error:', error);
                 alert('Geolocation access is denied, set default location to Delhi');
                 displayWeather('Delhi');
                 displayForecast('Delhi');
@@ -352,15 +364,28 @@ function getUserLocationAndDisplayWeather() {
 }
 
 function addToList(cityName) {
+    // FIX 10: Check if city already exists in the list
+    const existingItems = document.querySelectorAll('.list[data-value="' + cityName.toUpperCase() + '"]');
+    if (existingItems.length > 0) {
+        return; // Don't add duplicate cities
+    }
+
     const listEl = document.createElement('li');
     listEl.className = 'list';
     listEl.style.border = '#333 1px solid';
     listEl.style.borderRadius = "10px";
     listEl.style.margin = "20px";
     listEl.style.padding = "20px";
+    listEl.style.cursor = "pointer"; // Add cursor pointer
     listEl.textContent = cityName.toUpperCase();
     listEl.classList.add('list-group-item');
     listEl.dataset.value = cityName.toUpperCase();
+    
+    // FIX 11: Add click event to list items
+    listEl.addEventListener('click', () => {
+        displayWeather(cityName);
+        displayForecast(cityName);
+    });
     
     if (listGroup) {
         listGroup.after(listEl);
@@ -369,47 +394,67 @@ function addToList(cityName) {
 
 // Function to check if a city name exists
 async function checkCityExistence(cityName) {
-    const geocodingAPIUrl = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${apiKey}`;
-    const response = await fetch(geocodingAPIUrl);
-
-    if (response.ok) {
-        return true; // City exists
-    } else {
-        return false; // City does not exist
+    try {
+        const geocodingAPIUrl = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${apiKey}`;
+        const response = await fetch(geocodingAPIUrl);
+        return response.ok;
+    } catch (error) {
+        console.error('Error checking city existence:', error);
+        return false;
     }
 }
 
 searchButton.addEventListener('click', async () => {
     const cityName = searchCity.value.trim();
-    // Check if the city name is empty or contains only spaces
-    if (cityName.trim() === '') {
+    
+    if (cityName === '') {
         alert('Please enter a valid city name.');
         return;
     }
-    // Check if the city exists
-    const cityExists = await checkCityExistence(cityName);
+    
+    // Show loading state
+    searchButton.textContent = 'Searching...';
+    searchButton.disabled = true;
+    
+    try {
+        const cityExists = await checkCityExistence(cityName);
 
-    if (!cityExists) {
-        alert('The entered city does not exist. Please enter a valid city name.');
-        return;
-    } else {
+        if (!cityExists) {
+            alert('The entered city does not exist. Please enter a valid city name.');
+            return;
+        }
+
+        displayWeather(cityName);
+        displayForecast(cityName);
         addToList(cityName);
+        
+        // Clear search input
+        searchCity.value = '';
+        
+    } finally {
+        // Reset button state
+        searchButton.textContent = 'Search';
+        searchButton.disabled = false;
     }
+});
 
-    displayWeather(cityName);
-    displayForecast(cityName);
+// FIX 12: Allow search on Enter key press
+searchCity.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        searchButton.click();
+    }
 });
 
 function clearHistory(event) {
     event.preventDefault();
     const listElements = document.querySelectorAll('.list');
     listElements.forEach((listElement) => {
-        listElement.innerHTML = ''; // Clear the content of each element with the 'list' class
-        listElement.style.display = 'none';
+        listElement.remove(); // Use remove() instead of clearing innerHTML
     });
     localStorage.removeItem("cityname");
 }
 
 clearHistoryBtn.addEventListener('click', clearHistory);
+
 // Initialize on page load
 window.addEventListener('load', getUserLocationAndDisplayWeather);
